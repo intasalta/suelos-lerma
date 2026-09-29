@@ -1,0 +1,196 @@
+/* Estilos personalizados para el Visor de Suelos del Valle de Lerma */
+:root {
+  --primary: #1b4332;
+  --primary-light: #2d6a4f;
+  --accent: #d4a373;
+  --accent-light: #faedcd;
+  --dark: #1f2937;
+  --light: #f8fafc;
+  --border: #e2e8f0;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  overflow: hidden;
+}
+
+/* Mapa ocupando toda la pantalla debajo del navbar */
+#map {
+  width: 100%;
+  height: calc(100vh - 56px);
+  background: #e5e7eb;
+}
+
+/* Transiciones suaves */
+.transition-all {
+  transition: all 0.25s ease-in-out;
+}
+
+/* Barra de herramientas flotante del mapa */
+/* Barra de herramientas flotante del mapa */
+#map-toolbar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1005;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.15), 0 2px 6px -1px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  #map-toolbar {
+    left: 10px;
+    transform: none;
+    top: 10px;
+    max-width: calc(100vw - 70px);
+    overflow-x: auto;
+  }
+}
+
+/* Panel lateral (Sidebar) */
+#sidebar {
+  width: 480px;
+  max-width: 92vw;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1050;
+  box-shadow: -4px 0 25px rgba(0, 0, 0, 0.2);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s ease-in-out;
+  overflow-y: auto;
+}
+
+#sidebar.open {
+  transform: translateX(0);
+}
+
+#sidebar.maximized {
+  width: 880px;
+  max-width: 96vw;
+}
+
+#sidebar.maximized .chart-container {
+  height: 270px;
+}
+
+/* Leyenda flotante */
+#legend-card {
+  position: absolute;
+  bottom: 25px;
+  left: 15px;
+  z-index: 1005;
+  max-height: 280px;
+  max-width: 280px;
+  overflow-y: auto;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* Gráfico de perfil */
+.chart-container {
+  position: relative;
+  height: 220px;
+  width: 100%;
+}
+
+/* Tabla de horizontes compacta y clara */
+.horizon-table th {
+  background-color: #f1f5f9;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 8px;
+  color: #475569;
+}
+
+.horizon-table td {
+  padding: 6px 8px;
+  font-size: 0.82rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* Badges personalizados */
+.badge-ipc {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  font-weight: 600;
+}
+
+.badge-cu {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  font-weight: 600;
+}
+
+/* Scrollbars estilizados */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Modales limpios SIN desenfoque borroso */
+.modal-container {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.7);
+  z-index: 9999 !important;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-container.active {
+  display: flex !important;
+}
+
+/* Caja de información rápida al pasar el cursor (Hover Box) */
+#hover-info-box {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  z-index: 998;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transition: opacity 0.15s ease-in-out;
+  max-width: 320px;
+}
+
+/* Estilos de Impresión / PDF */
+@media print {
+  body {
+    overflow: visible;
+    background: white;
+  }
+  #map, #navbar, #legend-card, #hover-info-box, .no-print {
+    display: none !important;
+  }
+  #sidebar {
+    position: static;
+    transform: none;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .print-header {
+    display: block !important;
+  }
+}
