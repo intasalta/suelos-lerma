@@ -129,10 +129,14 @@ function initMap() {
     maxZoom: 18
   });
 
-  baseLayers.calles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    subdomains: 'abcd',
+  baseLayers.osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
     maxZoom: 19
+  });
+
+  baseLayers.argenmap = L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
+    attribution: '&copy; <a href="https://www.ign.gob.ar" target="_blank">Instituto Geográfico Nacional</a> &mdash; Argenmap',
+    maxZoom: 18
   });
 
   baseLayers.topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
@@ -173,6 +177,9 @@ async function loadSoilLayer(url) {
               l.bringToFront();
             }
 
+            // Formatear capacidad de uso visualmente (ej. 1_2 -> 1-2)
+            const cuDisplay = p.cap_uso ? String(p.cap_uso).replace(/_/g, '-') : '-';
+
             // Actualizar la caja de información rápida flotante
             if (hoverBox) {
               hoverBox.classList.remove('hidden');
@@ -180,7 +187,7 @@ async function loadSoilLayer(url) {
                 <div class="text-xs">
                   <div class="flex items-center justify-between gap-2 border-b pb-1 mb-1">
                     <span class="font-bold text-emerald-900">${p.nomencla || 'S/N'}</span>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">Cap. Uso: ${p.cap_uso || '-'}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">Cap. Uso: ${cuDisplay}</span>
                   </div>
                   <div class="font-medium text-slate-800">${p.suelo_1 || 'Unidad no clasificada'}</div>
                   <div class="text-[11px] text-slate-500 flex justify-between mt-0.5">

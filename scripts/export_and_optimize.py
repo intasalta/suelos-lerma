@@ -7,7 +7,7 @@ import geopandas as gpd
 BASE_DIR = r"c:\INTA\IA\LERMASUELOS"
 OUT_DIR = os.path.join(BASE_DIR, "visor_suelos")
 DATA_OUT_DIR = os.path.join(OUT_DIR, "data")
-MDB_JSON_PATH = r"C:\Users\elena.hernan\.gemini\antigravity\brain\3a8aa1f8-1f48-40e2-9c03-41e8a38c9344\scratch\mdb_dump.json"
+MDB_JSON_PATH = r"C:\Users\elena.hernan\.gemini\antigravity\brain\c7681b87-509c-49b5-9161-3e8046d0879f\scratch\mdb_dump.json"
 
 os.makedirs(DATA_OUT_DIR, exist_ok=True)
 
@@ -51,7 +51,6 @@ REPLACEMENTS = {
     'descripci\ufffdn': 'descripción',
     'Descripci\ufffdn': 'Descripción',
     'clim\ufffdticas': 'climáticas',
-    'per\ufffdo': 'perío',
     'per\ufffdo': 'período',
     'posici\ufffdn': 'posición',
     'condici\ufffdn': 'condición',
@@ -97,7 +96,13 @@ REPLACEMENTS = {
     'Agr\ufffdcola': 'Agrícola',
     'agr\ufffdcola': 'agrícola',
     '25\ufffd': '25°',
-    '65\ufffd': '65°'
+    '65\ufffd': '65°',
+    'pl\ufffdstico': 'plástico',
+    'pl\ufffdstica': 'plástica',
+    'Sol\ufffd': 'Solá',
+    'Aut\ufffddromo': 'Autódromo',
+    'Pardque': 'Parque',
+    'Estaci\ufffdn': 'Estación'
 }
 
 def clean_text(text):
@@ -129,6 +134,7 @@ def num_val(v):
     try:
         if isinstance(v, str):
             v = v.replace(',', '.').strip()
+            v = v.replace('+', '').strip()
         return round(float(v), 2)
     except:
         return None
@@ -168,52 +174,21 @@ for r in mdb['Cap_Uso_prac']:
         except:
             pass
 
-# 3. Horizontes analíticos
-horizontes_por_serie = {}
-for r in mdb['Desc_morfol_anal']:
-    nom_serie = clean_text(r.get('Nombre'))
-    if not nom_serie:
-        continue
-    if nom_serie not in horizontes_por_serie:
-        horizontes_por_serie[nom_serie] = []
-
-    h_data = {
-        "id": r.get('Id'),
-        "horizonte": clean_text(r.get('Horizonte')),
-        "desde": num_val(r.get('desde')),
-        "hasta": num_val(r.get('hasta')),
-        "descripcion": get_desc(r),
-        "arcilla": num_val(r.get('arcilla')),
-        "limo": num_val(r.get('limo')),
-        "arena": num_val(r.get('arena')),
-        "ph": num_val(r.get('pH_pasta')),
-        "mat_org": num_val(r.get('Mat_org')),
-        "carb_org": num_val(r.get('Carb_org')),
-        "nitrogeno": num_val(r.get('Nitrog_')),
-        "fosforo_ppm": num_val(r.get('P_ppm')),
-        "conductividad": num_val(r.get('conduct_mmhos/cm')),
-        "carbonatos": num_val(r.get('carbonat_%')),
-        "ca": num_val(r.get('Ca++')),
-        "mg": num_val(r.get('Mg++')),
-        "k": num_val(r.get('K+')),
-        "na": num_val(r.get('Na+')),
-        "cic": num_val(r.get('CIC')),
-        "t_psb": num_val(r.get('T_PSB')),
-        "psi": num_val(r.get('%Sod_intercamb'))
-    }
-    horizontes_por_serie[nom_serie].append(h_data)
-
-for s in horizontes_por_serie:
-    horizontes_por_serie[s].sort(key=lambda x: (x['desde'] if x['desde'] is not None else 999))
-
-# 4. Datos de perfiles de campo
-perfiles_por_serie = {}
+# 3. Perfiles de campo ambientales (Tabla Datos)
+perfiles_dict = {}
 for r in mdb['Datos']:
-    nom_serie = clean_text(r.get('Nomb_Serie'))
-    if not nom_serie:
+    p_id = r.get('Id')
+    if p_id is None:
         continue
-    perf_data = {
-        "hoja": clean_text(r.get('Hoja')),
+    nom_serie = clean_text(r.get('Nomb_Serie'))
+    hoja = clean_text(r.get('Hoja'))
+    ubic = clean_text(r.get('Ubic_'))
+    
+    perfiles_dict[p_id] = {
+        "id": p_id,
+        "serie": nom_serie,
+        "hoja": hoja,
+        "ubicacion": ubic,
         "fecha": clean_text(r.get('Fecha')),
         "lat": clean_text(r.get('Lat')),
         "long": clean_text(r.get('Long')),
@@ -235,9 +210,64 @@ for r in mdb['Datos']:
         "limitacion_principal": clean_text(r.get('Limitac_princ')),
         "subgrupo_usda": clean_text(r.get('Sub_grup')),
         "clasif_utilitaria": clean_text(r.get('Clas_Utilitar')),
-        "ubicacion": clean_text(r.get('Ubic_'))
+        "horizontes": []
     }
-    perfiles_por_serie[nom_serie] = perf_data
+
+# 4. Horizontes analíticos (Tabla Desc_morfol_anal)
+seen_horizons = set()
+
+for r in mdb['Desc_morfol_anal']:
+    link = r.get('LINKEO')
+    nom_serie = clean_text(r.get('Nombre'))
+    
+    # Omitir filas sin linkeo que son duplicadas no enlazadas en el mdb original
+    if link is None and nom_serie == 'Cerrillos':
+        continue
+        
+    horiz_nombre = clean_text(r.get('Horizonte'))
+    desde = num_val(r.get('desde'))
+    hasta = num_val(r.get('hasta'))
+    hasta_raw = clean_text(r.get('hasta'))
+    
+    # Deduplicar filas idénticas accidentales en Access
+    dup_key = (link, nom_serie, horiz_nombre, desde, hasta, str(r.get('pH_pasta')), str(r.get('arcilla')))
+    if dup_key in seen_horizons:
+        continue
+    seen_horizons.add(dup_key)
+    
+    h_data = {
+        "id": r.get('Id'),
+        "horizonte": horiz_nombre,
+        "desde": desde,
+        "hasta": hasta,
+        "hasta_raw": hasta_raw,
+        "descripcion": get_desc(r),
+        "arcilla": num_val(r.get('arcilla')),
+        "limo": num_val(r.get('limo')),
+        "arena": num_val(r.get('arena')),
+        "ph": num_val(r.get('pH_pasta')),
+        "mat_org": num_val(r.get('Mat_org')),
+        "carb_org": num_val(r.get('Carb_org')),
+        "nitrogeno": num_val(r.get('Nitrog_')),
+        "fosforo_ppm": num_val(r.get('P_ppm')),
+        "conductividad": num_val(r.get('conduct_mmhos/cm')),
+        "carbonatos": num_val(r.get('carbonat_%')),
+        "ca": num_val(r.get('Ca++')),
+        "mg": num_val(r.get('Mg++')),
+        "k": num_val(r.get('K+')),
+        "na": num_val(r.get('Na+')),
+        "suma_bases": num_val(r.get('S_SumBase')),
+        "cic": num_val(r.get('CIC')),
+        "t_psb": num_val(r.get('T_PSB')),
+        "psi": num_val(r.get('%Sod_intercamb'))
+    }
+    
+    if link in perfiles_dict:
+        perfiles_dict[link]["horizontes"].append(h_data)
+
+# Ordenar horizontes dentro de cada perfil cronológicamente por profundidad
+for p in perfiles_dict.values():
+    p["horizontes"].sort(key=lambda x: (x['desde'] if x['desde'] is not None else 999))
 
 # 5. Series de suelos
 series_dict = {}
@@ -246,6 +276,23 @@ for r in mdb['Serie de suelos']:
     if not nombre:
         continue
     
+    # Asociar todos los perfiles de campo donde participó esta serie
+    perfiles_de_serie = []
+    for p_id, p in perfiles_dict.items():
+        if p["serie"].lower() == nombre.lower():
+            perfiles_de_serie.append(p)
+            
+    # Perfil ambiental por defecto
+    perfil_default = None
+    for p in perfiles_de_serie:
+        if p["horizontes"]:
+            perfil_default = p
+            break
+    if not perfil_default and perfiles_de_serie:
+        perfil_default = perfiles_de_serie[0]
+        
+    horizontes_default = perfil_default["horizontes"] if perfil_default else []
+    
     series_dict[nombre] = {
         "nombre": nombre,
         "descripcion": get_desc(r),
@@ -253,8 +300,9 @@ for r in mdb['Serie de suelos']:
         "suborden": clean_text(r.get('Suborden')),
         "gran_grupo": clean_text(r.get('Grangrup')),
         "subgrupo_usda": clean_text(r.get('Subgr_USDA')),
-        "perfil_ambiental": perfiles_por_serie.get(nombre),
-        "horizontes": horizontes_por_serie.get(nombre, [])
+        "perfiles": perfiles_de_serie,
+        "perfil_ambiental": perfil_default,
+        "horizontes": horizontes_default
     }
 
 # 6. Unidades cartográficas
@@ -264,7 +312,6 @@ for r in mdb['Unid_Cart']:
     if not simbolo:
         continue
     
-    # Limpiar símbolo de espacios extras
     simbolo = simbolo.strip()
     nom_uc = clean_text(r.get('Nomb_'))
     tipo = "Consociación"
@@ -311,12 +358,10 @@ for nom_serie, s_data in series_dict.items():
                 
     s_data["unidades_asociadas"] = sorted(ucs_de_serie)
     
-    # Determinar capacidad de uso sugerida para la serie
     cu_sug = None
     if s_data.get("perfil_ambiental") and s_data["perfil_ambiental"].get("clasif_utilitaria"):
         cu_sug = s_data["perfil_ambiental"]["clasif_utilitaria"]
     elif ucs_de_serie:
-        # Tomar la de la primera UC asociada
         cu_sug = unidades_cart_dict[ucs_de_serie[0]].get("cap_uso")
     s_data["capacidad_uso_sugerida"] = cu_sug or "1"
 
@@ -340,62 +385,4 @@ with open(suelos_info_path, "w", encoding="utf-8") as f:
     json.dump(info_consolidada, f, ensure_ascii=False, indent=2)
 
 print(f"Información consolidada guardada en {suelos_info_path}")
-
-# 7. Shapefile
-print("\nOptimizando capa geográfica...")
-shp_path = os.path.join(BASE_DIR, "suelos_vl.shp")
-gdf = gpd.read_file(shp_path)
-
-# Mapeo de nomenclaturas especiales
-map_noms = {
-    'Eza': 'EZa',
-    'RoL3': 'RoL3',
-    'CoLal2': 'CoLaI2',
-    'SAg': 'SAg',
-    'LCa': 'LCa',
-    'RAs': 'RAs',
-    'RAr': 'RAr',
-    'LAl': 'LAl'
-}
-
-def fix_nom(nom):
-    if not nom:
-        return ""
-    nom = str(nom).strip()
-    return map_noms.get(nom, nom)
-
-gdf['nomencla'] = gdf['nomencla'].apply(fix_nom)
-gdf['geometry'] = gdf['geometry'].simplify(tolerance=0.00008, preserve_topology=True)
-
-cols_to_keep = ['ogc_fid', 'nomencla', 'hoja', 'ipc', 'cap_uso', 'suelo_1', 'suelo_2', 'orden', 'grangrup', 'ind_prod', 'geometry']
-gdf_clean = gdf[[c for c in cols_to_keep if c in gdf.columns]].copy()
-
-for c in ['hoja', 'cap_uso', 'suelo_1', 'suelo_2', 'orden', 'grangrup', 'ind_prod']:
-    if c in gdf_clean.columns:
-        gdf_clean[c] = gdf_clean[c].apply(clean_text)
-
-geo_out_path = os.path.join(DATA_OUT_DIR, "suelos_valle_lerma.geojson")
-gdf_clean.to_file(geo_out_path, driver="GeoJSON")
-
-# Redondear coordenadas en el GeoJSON resultante para reducir tamaño y cargar instantáneo
-with open(geo_out_path, "r", encoding="utf-8") as f:
-    geo_data = json.load(f)
-
-def round_coords(coords):
-    if isinstance(coords, (int, float)):
-        return round(coords, 5)
-    elif isinstance(coords, list):
-        return [round_coords(c) for c in coords]
-    return coords
-
-for feature in geo_data.get("features", []):
-    geom = feature.get("geometry")
-    if geom and "coordinates" in geom:
-        geom["coordinates"] = round_coords(geom["coordinates"])
-
-with open(geo_out_path, "w", encoding="utf-8") as f:
-    json.dump(geo_data, f, separators=(',', ':'), ensure_ascii=False)
-
-size_mb = os.path.getsize(geo_out_path) / (1024 * 1024)
-print(f"GeoJSON listo y optimizado: {size_mb:.2f} MB")
-print("¡Limpieza de caracteres completada con éxito!")
+print("¡Procesamiento finalizado con éxito!")

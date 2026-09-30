@@ -4,8 +4,15 @@
 
 let appData = null;
 let currentSelectedFeature = null;
+let currentSelectedProfile = null;
+let currentAnalyticsView = 'full'; // 'full', 'fisica', 'quimica', 'cambio'
 let textureChart = null;
 let chemChart = null;
+
+function formatCapUso(val) {
+  if (!val || val === 'None' || val === 'null') return '-';
+  return String(val).replace(/_/g, '-');
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Iniciar mapa
@@ -170,7 +177,7 @@ function setupUIEvents() {
       practicas = capUsoData.practicas_ids.map(id => appData.practicas_recomendadas[id]).filter(Boolean);
     }
 
-    window.exportSoilPDF(serieData, ucData, capUsoData, practicas);
+    window.exportSoilPDF(serieData, ucData, capUsoData, practicas, currentSelectedProfile);
   };
 
   // Botones de descarga de PDF en el sidebar (superior e inferior)
@@ -178,6 +185,22 @@ function setupUIEvents() {
   const topDownloadPdfBtn = document.getElementById('sb-top-download-pdf-btn');
   if (downloadPdfBtn) downloadPdfBtn.addEventListener('click', downloadSelectedSoilPDF);
   if (topDownloadPdfBtn) topDownloadPdfBtn.addEventListener('click', downloadSelectedSoilPDF);
+
+  // Botones de selector de vista analítica (Completa / Física / Química / Cationes)
+  document.querySelectorAll('.view-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.view-filter-btn').forEach(b => {
+        b.classList.remove('active', 'bg-white', 'text-emerald-900', 'shadow-sm');
+        b.classList.add('hover:text-slate-900');
+      });
+      btn.classList.add('active', 'bg-white', 'text-emerald-900', 'shadow-sm');
+      btn.classList.remove('hover:text-slate-900');
+      currentAnalyticsView = btn.getAttribute('data-view') || 'full';
+      if (currentSelectedProfile) {
+        renderHorizontesTable(currentSelectedProfile.horizontes || [], currentAnalyticsView);
+      }
+    });
+  });
 
   // Control Solo Bordes / Transparente
   const toggleBordersBtn = document.getElementById('toggle-borders-btn');
@@ -272,6 +295,212 @@ function setupUIEvents() {
   });
 }
 
+// Actualizar factores ambientales en la pestaña Serie
+function renderEnvironmentalFactors(prof, isNonSoil, nomencla) {
+  const env = prof || {};
+  document.getElementById('sb-paisaje').textContent = env.paisaje || (isNonSoil ? '-' : '-');
+  document.getElementById('sb-relieve').textContent = env.relieve || '-';
+  document.getElementById('sb-pendiente').textContent = env.pendiente_pct ? `${env.pendiente_pct}%` : '-';
+  document.getElementById('sb-material').textContent = env.material_originario || '-';
+  document.getElementById('sb-vegetacion').textContent = env.vegetacion || '-';
+  document.getElementById('sb-drenaje').textContent = env.drenaje || '-';
+  document.getElementById('sb-permeabilidad').textContent = env.permeabilidad || '-';
+  document.getElementById('sb-limitacion').textContent = env.limitacion_principal || (isNonSoil ? 'Uso urbano / Hidrología' : '-');
+  document.getElementById('sb-uso-tierra').textContent = env.uso_tierra || (isNonSoil ? nomencla : '-');
+}
+
+// Banner informativo del perfil actualmente seleccionado
+function updateActiveProfileBanner(profile) {
+  const hojaEl = document.getElementById('prof-info-hoja');
+  const ubicEl = document.getElementById('prof-info-ubic');
+  const extraEl = document.getElementById('prof-info-extra');
+
+  if (hojaEl) hojaEl.textContent = profile?.hoja ? `Hoja: ${profile.hoja}` : 'Valle de Lerma';
+  if (ubicEl) ubicEl.textContent = profile?.ubicacion ? `Sitio: ${profile.ubicacion}` : 'Relevamiento típico';
+  if (extraEl) {
+    const hCount = (profile?.horizontes || []).length;
+    extraEl.textContent = hCount > 0 ? `${hCount} horizontes con analítica` : 'Sin analítica de laboratorio';
+  }
+}
+
+// Renderizar tabla analítica según la vista seleccionada y tarjetas morfológicas
+function renderHorizontesTable(horizs, view = 'full') {
+  const thead = document.getElementById('sb-horizontes-thead');
+  const tbody = document.getElementById('sb-horizontes-tbody');
+  const descContainer = document.getElementById('horizontes-desc-list');
+  if (!tbody || !thead) return;
+
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
+
+  if (!horizs || horizs.length === 0) {
+    thead.innerHTML = '<tr><th class="py-2 px-3 text-center">Horizontes</th></tr>';
+    tbody.innerHTML = '<tr><td class="text-center py-6 text-slate-500 italic">No se registran datos analíticos de laboratorio para este perfil típico en la base oficial.</td></tr>';
+    if (descContainer) descContainer.innerHTML = '<p class="text-slate-400 italic text-xs">No se dispone de notas morfológicas de campo para este elemento.</p>';
+    return;
+  }
+
+  // 1. Configurar columnas del thead según view
+  let headerHtml = '';
+  if (view === 'full') {
+    headerHtml = `
+      <tr>
+        <th class="sticky left-0 bg-slate-100 z-10 text-emerald-950">Horiz</th>
+        <th class="text-center">Prof (cm)</th>
+        <th class="text-right">Arc %</th>
+        <th class="text-right">Lim %</th>
+        <th class="text-right">Are %</th>
+        <th class="text-right">pH</th>
+        <th class="text-right">MO %</th>
+        <th class="text-right">CO %</th>
+        <th class="text-right">N %</th>
+        <th class="text-right">P (ppm)</th>
+        <th class="text-right">CE</th>
+        <th class="text-right">CaCO3 %</th>
+        <th class="text-right">Ca++</th>
+        <th class="text-right">Mg++</th>
+        <th class="text-right">Na+</th>
+        <th class="text-right">K+</th>
+        <th class="text-right">Suma B.</th>
+        <th class="text-right">CIC</th>
+        <th class="text-right">PSB %</th>
+        <th class="text-right">PSI %</th>
+      </tr>
+    `;
+  } else if (view === 'fisica') {
+    headerHtml = `
+      <tr>
+        <th class="text-emerald-950">Horiz</th>
+        <th class="text-center">Profundidad (cm)</th>
+        <th class="text-right">Arcilla %</th>
+        <th class="text-right">Limo %</th>
+        <th class="text-right">Arena %</th>
+        <th class="text-right">pH pasta</th>
+        <th class="text-right">Materia Orgánica %</th>
+      </tr>
+    `;
+  } else if (view === 'quimica') {
+    headerHtml = `
+      <tr>
+        <th class="text-emerald-950">Horiz</th>
+        <th class="text-center">Prof (cm)</th>
+        <th class="text-right">pH</th>
+        <th class="text-right">MO %</th>
+        <th class="text-right">Carb. Org. %</th>
+        <th class="text-right">Nitrógeno %</th>
+        <th class="text-right">P (ppm)</th>
+        <th class="text-right">CE (mmhos/cm)</th>
+        <th class="text-right">Carbonatos %</th>
+      </tr>
+    `;
+  } else if (view === 'cambio') {
+    headerHtml = `
+      <tr>
+        <th class="text-emerald-950">Horiz</th>
+        <th class="text-center">Prof (cm)</th>
+        <th class="text-right">Ca++</th>
+        <th class="text-right">Mg++</th>
+        <th class="text-right">Na+</th>
+        <th class="text-right">K+</th>
+        <th class="text-right">Suma Bases</th>
+        <th class="text-right">CIC</th>
+        <th class="text-right">PSB %</th>
+        <th class="text-right">PSI %</th>
+      </tr>
+    `;
+  }
+  thead.innerHTML = headerHtml;
+
+  // 2. Rellenar filas del tbody
+  horizs.forEach(h => {
+    const tr = document.createElement('tr');
+    const profStr = `${h.desde ?? 0} - ${h.hasta ?? (h.hasta_raw || '+')}`;
+
+    if (view === 'full') {
+      tr.innerHTML = `
+        <td class="font-bold text-emerald-900 sticky left-0 bg-white shadow-sm">${h.horizonte || '-'}</td>
+        <td class="text-center whitespace-nowrap font-mono text-[11px]">${profStr}</td>
+        <td class="text-right">${h.arcilla ?? '-'}</td>
+        <td class="text-right">${h.limo ?? '-'}</td>
+        <td class="text-right">${h.arena ?? '-'}</td>
+        <td class="text-right font-medium text-emerald-800">${h.ph ?? '-'}</td>
+        <td class="text-right font-medium text-amber-800">${h.mat_org ?? '-'}</td>
+        <td class="text-right">${h.carb_org ?? '-'}</td>
+        <td class="text-right">${h.nitrogeno ?? '-'}</td>
+        <td class="text-right font-medium">${h.fosforo_ppm ?? '-'}</td>
+        <td class="text-right">${h.conductividad ?? '-'}</td>
+        <td class="text-right">${h.carbonatos ?? '-'}</td>
+        <td class="text-right">${h.ca ?? '-'}</td>
+        <td class="text-right">${h.mg ?? '-'}</td>
+        <td class="text-right">${h.na ?? '-'}</td>
+        <td class="text-right">${h.k ?? '-'}</td>
+        <td class="text-right font-medium">${h.suma_bases ?? '-'}</td>
+        <td class="text-right font-medium text-blue-900">${h.cic ?? '-'}</td>
+        <td class="text-right">${h.t_psb ?? '-'}</td>
+        <td class="text-right">${h.psi ?? '-'}</td>
+      `;
+    } else if (view === 'fisica') {
+      tr.innerHTML = `
+        <td class="font-bold text-emerald-900">${h.horizonte || '-'}</td>
+        <td class="text-center whitespace-nowrap font-mono text-[11px]">${profStr}</td>
+        <td class="text-right font-medium text-orange-900">${h.arcilla ?? '-'}</td>
+        <td class="text-right font-medium text-amber-800">${h.limo ?? '-'}</td>
+        <td class="text-right font-medium text-sky-800">${h.arena ?? '-'}</td>
+        <td class="text-right font-medium text-emerald-800">${h.ph ?? '-'}</td>
+        <td class="text-right font-medium">${h.mat_org ?? '-'}</td>
+      `;
+    } else if (view === 'quimica') {
+      tr.innerHTML = `
+        <td class="font-bold text-emerald-900">${h.horizonte || '-'}</td>
+        <td class="text-center whitespace-nowrap font-mono text-[11px]">${profStr}</td>
+        <td class="text-right font-medium text-emerald-800">${h.ph ?? '-'}</td>
+        <td class="text-right font-medium text-amber-800">${h.mat_org ?? '-'}</td>
+        <td class="text-right">${h.carb_org ?? '-'}</td>
+        <td class="text-right">${h.nitrogeno ?? '-'}</td>
+        <td class="text-right font-medium text-indigo-900">${h.fosforo_ppm ?? '-'}</td>
+        <td class="text-right">${h.conductividad ?? '-'}</td>
+        <td class="text-right">${h.carbonatos ?? '-'}</td>
+      `;
+    } else if (view === 'cambio') {
+      tr.innerHTML = `
+        <td class="font-bold text-emerald-900">${h.horizonte || '-'}</td>
+        <td class="text-center whitespace-nowrap font-mono text-[11px]">${profStr}</td>
+        <td class="text-right">${h.ca ?? '-'}</td>
+        <td class="text-right">${h.mg ?? '-'}</td>
+        <td class="text-right">${h.na ?? '-'}</td>
+        <td class="text-right">${h.k ?? '-'}</td>
+        <td class="text-right font-medium">${h.suma_bases ?? '-'}</td>
+        <td class="text-right font-medium text-blue-900">${h.cic ?? '-'}</td>
+        <td class="text-right">${h.t_psb ?? '-'}</td>
+        <td class="text-right">${h.psi ?? '-'}</td>
+      `;
+    }
+    tbody.appendChild(tr);
+  });
+
+  // 3. Rellenar descripciones morfológicas de campo
+  if (descContainer) {
+    descContainer.innerHTML = '';
+    const horizsWithDesc = horizs.filter(h => h.descripcion && h.descripcion.trim());
+    if (horizsWithDesc.length === 0) {
+      descContainer.innerHTML = '<p class="text-slate-400 italic text-xs">Sin descripción morfológica textual registrada para este perfil.</p>';
+    } else {
+      horizsWithDesc.forEach(h => {
+        const item = document.createElement('div');
+        item.className = 'bg-slate-50 border border-slate-200 rounded p-2 text-xs';
+        item.innerHTML = `
+          <div class="flex items-center gap-2 font-bold text-emerald-950 mb-0.5">
+            <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[11px]">${h.horizonte || '-'}</span>
+            <span class="text-slate-500 font-normal">(${h.desde ?? 0} - ${h.hasta ?? (h.hasta_raw || '+')} cm)</span>
+          </div>
+          <p class="text-slate-600 leading-relaxed text-justify mt-1">${h.descripcion}</p>
+        `;
+        descContainer.appendChild(item);
+      });
+    }
+  }
+}
+
 // Mostrar los datos en el Sidebar
 function displaySoilDetails(feature) {
   const sidebar = document.getElementById('sidebar');
@@ -297,7 +526,7 @@ function displaySoilDetails(feature) {
   document.getElementById('sb-nombre-uc').textContent = isNonSoil ? `Área No Edáfica (${nomencla})` : (uc.nombre || s1 || 'Unidad Cartográfica');
   document.getElementById('sb-tipo-uc').textContent = isNonSoil ? 'Elemento Misceláneo' : (uc.tipo || 'Consociación');
   document.getElementById('sb-ipc').textContent = (uc.ipc !== undefined && uc.ipc !== null) ? uc.ipc : (p.ipc || '-');
-  document.getElementById('sb-cap-uso').textContent = uc.cap_uso || p.cap_uso || '-';
+  document.getElementById('sb-cap-uso').textContent = formatCapUso(uc.cap_uso || p.cap_uso);
   document.getElementById('sb-hoja').textContent = p.hoja || 'Valle de Lerma';
 
   // 2. Pestaña de Serie
@@ -336,45 +565,78 @@ function displaySoilDetails(feature) {
     document.getElementById('sb-serie-desc').textContent = serie.descripcion || uc.descripcion || 'Sin descripción detallada registrada para esta serie.';
   }
 
-  // Perfil ambiental
-  const env = serie.perfil_ambiental || {};
-  document.getElementById('sb-paisaje').textContent = env.paisaje || (isNonSoil ? '-' : '-');
-  document.getElementById('sb-relieve').textContent = env.relieve || '-';
-  document.getElementById('sb-pendiente').textContent = env.pendiente_pct ? `${env.pendiente_pct}%` : '-';
-  document.getElementById('sb-material').textContent = env.material_originario || '-';
-  document.getElementById('sb-vegetacion').textContent = env.vegetacion || '-';
-  document.getElementById('sb-drenaje').textContent = env.drenaje || '-';
-  document.getElementById('sb-permeabilidad').textContent = env.permeabilidad || '-';
-  document.getElementById('sb-limitacion').textContent = env.limitacion_principal || (isNonSoil ? 'Uso urbano / Hidrología' : '-');
-  document.getElementById('sb-uso-tierra').textContent = env.uso_tierra || (isNonSoil ? nomencla : '-');
+  // 3. Selección y configuración del Perfil Activo
+  const perfiles = serie.perfiles || [];
+  const hojaPoligono = (p.hoja || '').trim().toLowerCase();
 
-  // 3. Horizontes y Analítica
-  const horizs = serie.horizontes || [];
-  const tbody = document.getElementById('sb-horizontes-tbody');
-  tbody.innerHTML = '';
-
-  if (horizs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500 italic">No se registran datos analíticos de perfil típico para esta serie.</td></tr>';
+  if (perfiles.length > 0) {
+    // Buscar perfil que coincida con la Hoja del polígono
+    const match = perfiles.find(prof => prof.hoja && hojaPoligono && (prof.hoja.toLowerCase().includes(hojaPoligono) || hojaPoligono.includes(prof.hoja.toLowerCase())));
+    currentSelectedProfile = match || perfiles[0];
   } else {
-    horizs.forEach(h => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="font-bold text-emerald-900">${h.horizonte || '-'}</td>
-        <td class="text-center whitespace-nowrap">${h.desde ?? 0} - ${h.hasta ?? ''}</td>
-        <td class="text-right">${h.arcilla ?? '-'}</td>
-        <td class="text-right">${h.limo ?? '-'}</td>
-        <td class="text-right">${h.arena ?? '-'}</td>
-        <td class="text-right font-medium">${h.ph ?? '-'}</td>
-        <td class="text-right">${h.mat_org ?? '-'}</td>
-      `;
-      tbody.appendChild(tr);
-    });
+    currentSelectedProfile = serie.perfil_ambiental || { horizontes: serie.horizontes || [] };
   }
 
-  // 4. Gráficos de Perfil
-  renderProfileCharts(horizs);
+  // Configurar Selector de Perfiles (si hay más de 1 perfil en diferentes hojas)
+  const profileSelectorContainer = document.getElementById('profile-selector-container');
+  const profileButtonsList = document.getElementById('profile-buttons-list');
+  const profileActiveBadge = document.getElementById('profile-active-badge');
 
-  // 5. Aptitud y Prácticas de Manejo
+  if (profileSelectorContainer && profileButtonsList) {
+    if (perfiles.length > 1) {
+      profileSelectorContainer.classList.remove('hidden');
+      profileButtonsList.innerHTML = '';
+      if (profileActiveBadge) {
+        profileActiveBadge.textContent = `${perfiles.length} relevamientos`;
+      }
+
+      perfiles.forEach(prof => {
+        const btn = document.createElement('button');
+        const isActive = prof.id === currentSelectedProfile?.id;
+        btn.type = 'button';
+        btn.className = `profile-pill px-2.5 py-1 rounded-lg text-xs font-medium border transition ${isActive ? 'active' : 'bg-white hover:bg-amber-100 text-amber-950 border-amber-300'}`;
+        
+        const hojaLabel = prof.hoja ? `Hoja ${prof.hoja}` : `Perfil #${prof.id}`;
+        const ubicLabel = prof.ubicacion ? ` (${prof.ubicacion})` : '';
+        btn.textContent = `${hojaLabel}${ubicLabel}`;
+        btn.title = `Ver perfil relevado en ${hojaLabel}`;
+
+        btn.addEventListener('click', () => {
+          currentSelectedProfile = prof;
+          // Actualizar estilos activos de botones
+          profileButtonsList.querySelectorAll('.profile-pill').forEach(b => {
+            b.classList.remove('active');
+            b.className = 'profile-pill px-2.5 py-1 rounded-lg text-xs font-medium border transition bg-white hover:bg-amber-100 text-amber-950 border-amber-300';
+          });
+          btn.className = 'profile-pill px-2.5 py-1 rounded-lg text-xs font-medium border transition active';
+
+          // Actualizar banner informativo, tabla y gráficos
+          updateActiveProfileBanner(currentSelectedProfile);
+          renderEnvironmentalFactors(currentSelectedProfile, isNonSoil, nomencla);
+          renderHorizontesTable(currentSelectedProfile?.horizontes || [], currentAnalyticsView);
+          renderProfileCharts(currentSelectedProfile?.horizontes || []);
+        });
+
+        profileButtonsList.appendChild(btn);
+      });
+    } else {
+      profileSelectorContainer.classList.add('hidden');
+    }
+  }
+
+  // Actualizar banner del perfil activo
+  updateActiveProfileBanner(currentSelectedProfile);
+
+  // Perfil ambiental en pestaña Serie
+  renderEnvironmentalFactors(currentSelectedProfile, isNonSoil, nomencla);
+
+  // 4. Renderizar Horizontes y Analítica
+  renderHorizontesTable(currentSelectedProfile?.horizontes || [], currentAnalyticsView);
+
+  // 5. Gráficos de Perfil
+  renderProfileCharts(currentSelectedProfile?.horizontes || []);
+
+  // 6. Aptitud y Prácticas de Manejo
   document.getElementById('sb-cu-desc').textContent = capUso.descripcion || 'Información de capacidad de uso en desarrollo.';
   
   const practicasContainer = document.getElementById('sb-practicas-list');
@@ -401,98 +663,104 @@ function displaySoilDetails(feature) {
 
 // Renderizar gráficos de texturas y química en profundidad
 function renderProfileCharts(horizontes) {
-  if (!window.Chart || horizontes.length === 0) return;
+  if (!window.Chart) return;
 
-  // Filtrar horizontes con profundidad válida
-  const validH = horizontes.filter(h => h.desde !== null && h.hasta !== null);
-  if (validH.length === 0) return;
+  const validH = (horizontes || []).filter(h => h.desde !== null && (h.hasta !== null || h.hasta_raw));
+  const ctxTextura = document.getElementById('chart-textura');
+  const ctxChem = document.getElementById('chart-quimica');
 
-  const labels = validH.map(h => `${h.horizonte} (${h.desde}-${h.hasta} cm)`);
+  if (validH.length === 0) {
+    if (textureChart) { textureChart.destroy(); textureChart = null; }
+    if (chemChart) { chemChart.destroy(); chemChart = null; }
+    return;
+  }
+
+  const labels = validH.map(h => `${h.horizonte} (${h.desde}-${h.hasta ?? (h.hasta_raw || '+')} cm)`);
   const arcillaData = validH.map(h => h.arcilla);
   const limoData = validH.map(h => h.limo);
   const arenaData = validH.map(h => h.arena);
 
   // Gráfico Textura
-  const ctxTextura = document.getElementById('chart-textura');
   if (textureChart) textureChart.destroy();
-
-  textureChart = new Chart(ctxTextura, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        { label: 'Arcilla %', data: arcillaData, backgroundColor: '#c2410c' },
-        { label: 'Limo %', data: limoData, backgroundColor: '#ca8a04' },
-        { label: 'Arena %', data: arenaData, backgroundColor: '#0284c7' }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: { stacked: true, ticks: { font: { size: 10 } } },
-        y: { stacked: true, max: 100, title: { display: true, text: '% Granulométrico' } }
+  if (ctxTextura) {
+    textureChart = new Chart(ctxTextura, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Arcilla %', data: arcillaData, backgroundColor: '#c2410c' },
+          { label: 'Limo %', data: limoData, backgroundColor: '#ca8a04' },
+          { label: 'Arena %', data: arenaData, backgroundColor: '#0284c7' }
+        ]
       },
-      plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, ticks: { font: { size: 10 } } },
+          y: { stacked: true, max: 100, title: { display: true, text: '% Granulométrico' } }
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+        }
       }
-    }
-  });
+    });
+  }
 
   // Gráfico pH y MO
-  const ctxChem = document.getElementById('chart-quimica');
   if (chemChart) chemChart.destroy();
+  if (ctxChem) {
+    const phData = validH.map(h => h.ph);
+    const moData = validH.map(h => h.mat_org);
 
-  const phData = validH.map(h => h.ph);
-  const moData = validH.map(h => h.mat_org);
-
-  chemChart = new Chart(ctxChem, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'pH pasta',
-          data: phData,
-          borderColor: '#16a34a',
-          backgroundColor: '#16a34a',
-          yAxisID: 'y'
-        },
-        {
-          label: 'Materia Orgánica %',
-          data: moData,
-          borderColor: '#9333ea',
-          backgroundColor: '#9333ea',
-          yAxisID: 'y1'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: { ticks: { font: { size: 10 } } },
-        y: {
-          type: 'linear',
-          display: true,
-          position: 'left',
-          title: { display: true, text: 'pH' },
-          min: 4,
-          max: 10
-        },
-        y1: {
-          type: 'linear',
-          display: true,
-          position: 'right',
-          title: { display: true, text: 'MO %' },
-          grid: { drawOnChartArea: false }
-        }
+    chemChart = new Chart(ctxChem, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'pH pasta',
+            data: phData,
+            borderColor: '#16a34a',
+            backgroundColor: '#16a34a',
+            yAxisID: 'y'
+          },
+          {
+            label: 'Materia Orgánica %',
+            data: moData,
+            borderColor: '#9333ea',
+            backgroundColor: '#9333ea',
+            yAxisID: 'y1'
+          }
+        ]
       },
-      plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { font: { size: 10 } } },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: { display: true, text: 'pH' },
+            min: 4,
+            max: 10
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: { display: true, text: 'MO %' },
+            grid: { drawOnChartArea: false }
+          }
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+        }
       }
-    }
-  });
+    });
+  }
 }
 
 // Descargar la ficha técnica en PDF directamente por nombre de serie
@@ -523,7 +791,8 @@ function downloadSerieByName(serieName) {
     practicas = capUsoData.practicas_ids.map(id => appData.practicas_recomendadas[id]).filter(Boolean);
   }
 
-  window.exportSoilPDF(serie, ucData, capUsoData, practicas);
+  const defaultProfile = serie.perfil_ambiental || (serie.perfiles && serie.perfiles[0]);
+  window.exportSoilPDF(serie, ucData, capUsoData, practicas, defaultProfile);
 }
 
 // Variables globales para filtros de catálogo
@@ -565,6 +834,9 @@ function populateSeriesCatalog() {
   }
 
   series.sort((a, b) => a.nombre.localeCompare(b.nombre)).forEach(s => {
+    const pCount = (s.perfiles && s.perfiles.length > 1) ? `${s.perfiles.length} perfiles muestreados` : `${s.horizontes?.length || 0} horizontes analíticos`;
+    const hojasLabel = (s.perfiles && s.perfiles.length > 1) ? s.perfiles.map(p => p.hoja).filter(Boolean).join(', ') : (s.perfil_ambiental?.hoja ? 'Hoja ' + s.perfil_ambiental.hoja : '');
+
     const card = document.createElement('div');
     card.className = 'border border-slate-200 rounded-xl p-3.5 hover:shadow-md transition bg-white flex flex-col justify-between';
     card.innerHTML = `
@@ -578,8 +850,8 @@ function populateSeriesCatalog() {
       </div>
       <div>
         <div class="text-[10px] text-slate-400 mb-2 flex items-center justify-between">
-          <span><i class="fa-solid fa-layer-group text-slate-400 mr-1"></i> ${s.horizontes?.length || 0} horizontes analíticos</span>
-          <span>${s.perfil_ambiental?.hoja ? 'Hoja: ' + s.perfil_ambiental.hoja : ''}</span>
+          <span><i class="fa-solid fa-layer-group text-slate-400 mr-1"></i> ${pCount}</span>
+          <span class="truncate ml-1" title="${hojasLabel}">${hojasLabel}</span>
         </div>
         <div class="text-[11px] text-emerald-900 bg-emerald-50/80 border border-emerald-200 px-2 py-1 rounded-lg mb-2.5 flex items-center gap-1.5">
           <i class="fa-solid fa-map-location-dot text-emerald-700"></i>

@@ -3,7 +3,12 @@
  * Utiliza jsPDF y jsPDF-AutoTable
  */
 
-function exportSoilPDF(serieData, ucData, capUsoData, practicasData) {
+function formatCapUsoPDF(val) {
+  if (!val || val === 'None' || val === 'null') return '-';
+  return String(val).replace(/_/g, '-');
+}
+
+function exportSoilPDF(serieData, ucData, capUsoData, practicasData, selectedProfile) {
   if (!window.jspdf) {
     alert("Cargando librerías de PDF, por favor intente nuevamente en unos segundos.");
     return;
@@ -21,6 +26,9 @@ function exportSoilPDF(serieData, ucData, capUsoData, practicasData) {
   const serieName = serieData ? serieData.nombre : (ucData ? ucData.suelo_1 : 'Suelo');
   const ucName = ucData ? (ucData.nombre || ucData.simbolo) : (serieData?.unidades_asociadas?.length ? `Unidades: ${serieData.unidades_asociadas.join(', ')}` : 'Valle de Lerma');
   const ucSimb = ucData ? ucData.simbolo : (serieData?.unidades_asociadas?.join(', ') || '-');
+
+  // Determinar perfil activo
+  const profile = selectedProfile || serieData?.activeProfile || serieData?.perfil_ambiental || (serieData?.perfiles && serieData.perfiles[0]);
 
   // --- ENCABEZADO INSTITUCIONAL ---
   doc.setFillColor(...primaryColor);
@@ -109,8 +117,8 @@ function exportSoilPDF(serieData, ucData, capUsoData, practicasData) {
   doc.text("CAPACIDAD USO:", col1, py);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(194, 65, 12);
-  const capUsoVal = ucData?.cap_uso || serieData?.capacidad_uso_sugerida || serieData?.perfil_ambiental?.clasif_utilitaria || 'S/D';
-  doc.text(`${capUsoVal}`, col1 + 28, py);
+  const rawCapUso = ucData?.cap_uso || serieData?.capacidad_uso_sugerida || profile?.clasif_utilitaria || 'S/D';
+  doc.text(`${formatCapUsoPDF(rawCapUso)}`, col1 + 28, py);
 
   doc.setTextColor(51, 65, 85);
   doc.setFont('helvetica', 'bold');
@@ -127,11 +135,10 @@ function exportSoilPDF(serieData, ucData, capUsoData, practicasData) {
   doc.text(`${ucData?.tipo || (serieData?.unidades_asociadas?.length ? 'Componente UCs' : 'Serie pura')}`, col3 + 26, py);
 
   py += 7;
-  const perf = serieData?.perfil_ambiental;
   doc.setFont('helvetica', 'bold');
   doc.text("PAISAJE / RELIEVE:", col1, py);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${perf?.paisaje || '-'} | Relieve: ${perf?.relieve || '-'}`, col1 + 32, py);
+  doc.text(`${profile?.paisaje || '-'} | Relieve: ${profile?.relieve || '-'}`, col1 + 32, py);
 
   y += 42;
 
@@ -151,54 +158,138 @@ function exportSoilPDF(serieData, ucData, capUsoData, practicasData) {
     y += (splitDesc.length * 4.2) + 6;
   }
 
-  // --- TABLA DE HORIZONTES ANALÍTICOS ---
-  const horizs = serieData?.horizontes || [];
-  if (horizs.length > 0 && doc.autoTable) {
+  // --- INFORMACIÓN DEL SITIO DE MUESTREO ---
+  if (profile) {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setTextColor(...primaryColor);
-    doc.text("PERFIL TÍPICO - HORIZONTES Y ANÁLISIS FÍSICO-QUÍMICOS:", 14, y);
-    y += 4;
+    const ubicTxt = profile.ubicacion ? ` - Sitio: ${profile.ubicacion}` : '';
+    const hojaTxt = profile.hoja ? `Hoja ${profile.hoja}` : 'Valle de Lerma';
+    doc.text(`PERFIL TÍPICO DE CAMPO (${hojaTxt}${ubicTxt}):`, 14, y);
+    y += 5;
+  }
 
-    const head = [["Horiz.", "Prof. (cm)", "Descrip. / Color", "Arcilla %", "Limo %", "Arena %", "pH", "MO %", "P ppm", "CIC"]];
-    const body = horizs.map(h => [
+  // --- TABLA 1: GRANULOMETRÍA Y FERTILIDAD QUÍMICA ---
+  const horizs = profile?.horizontes || serieData?.horizontes || [];
+  if (horizs.length > 0 && doc.autoTable) {
+    const head1 = [["Horiz.", "Prof. (cm)", "Arc %", "Lim %", "Are %", "pH", "MO %", "CO %", "N %", "P ppm", "CE", "CaCO3%"]];
+    const body1 = horizs.map(h => [
       h.horizonte || '-',
       `${h.desde ?? 0} - ${h.hasta ?? ''}`,
-      (h.descripcion || '').substring(0, 45) + (h.descripcion?.length > 45 ? '...' : ''),
       h.arcilla ?? '-',
       h.limo ?? '-',
       h.arena ?? '-',
       h.ph ?? '-',
       h.mat_org ?? '-',
+      h.carb_org ?? '-',
+      h.nitrogeno ?? '-',
       h.fosforo_ppm ?? '-',
-      h.cic ?? '-'
+      h.conductividad ?? '-',
+      h.carbonatos ?? '-'
     ]);
 
     doc.autoTable({
       startY: y,
-      head: head,
-      body: body,
+      head: head1,
+      body: body1,
       theme: 'grid',
-      headStyles: { fillColor: primaryColor, fontSize: 7.5, fontStyle: 'bold', halign: 'center' },
-      bodyStyles: { fontSize: 7, textColor: [30, 41, 59] },
+      headStyles: { fillColor: primaryColor, fontSize: 7, fontStyle: 'bold', halign: 'center' },
+      bodyStyles: { fontSize: 6.8, textColor: [30, 41, 59], halign: 'right' },
       columnStyles: {
-        0: { fontStyle: 'bold', halign: 'center', cellWidth: 14 },
-        1: { halign: 'center', cellWidth: 18 },
-        2: { cellWidth: 62 },
-        3: { halign: 'right', cellWidth: 14 },
-        4: { halign: 'right', cellWidth: 14 },
-        5: { halign: 'right', cellWidth: 14 },
-        6: { halign: 'right', cellWidth: 11 },
-        7: { halign: 'right', cellWidth: 11 },
-        8: { halign: 'right', cellWidth: 12 },
-        9: { halign: 'right', cellWidth: 12 }
+        0: { fontStyle: 'bold', halign: 'center', cellWidth: 15 },
+        1: { halign: 'center', cellWidth: 20 },
+        2: { cellWidth: 14 },
+        3: { cellWidth: 14 },
+        4: { cellWidth: 14 },
+        5: { cellWidth: 13 },
+        6: { cellWidth: 14 },
+        7: { cellWidth: 14 },
+        8: { cellWidth: 14 },
+        9: { cellWidth: 16 },
+        10: { cellWidth: 14 },
+        11: { cellWidth: 14 }
       },
       margin: { left: 14, right: 14 }
     });
 
-    y = doc.lastAutoTable.finalY + 8;
+    y = doc.lastAutoTable.finalY + 5;
+
+    // --- TABLA 2: COMPLEJO DE CAMBIO / CATIONES ---
+    const head2 = [["Horiz.", "Ca++", "Mg++", "Na+", "K+", "Suma Bases", "CIC", "PSB %", "PSI %"]];
+    const body2 = horizs.map(h => [
+      h.horizonte || '-',
+      h.ca ?? '-',
+      h.mg ?? '-',
+      h.na ?? '-',
+      h.k ?? '-',
+      h.suma_bases ?? '-',
+      h.cic ?? '-',
+      h.t_psb ?? '-',
+      h.psi ?? '-'
+    ]);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...primaryColor);
+    doc.text("COMPLEJO DE INTERCAMBIO CATIÓNICO (meq/100g):", 14, y);
+    y += 3;
+
+    doc.autoTable({
+      startY: y,
+      head: head2,
+      body: body2,
+      theme: 'grid',
+      headStyles: { fillColor: [45, 106, 79], fontSize: 7, fontStyle: 'bold', halign: 'center' },
+      bodyStyles: { fontSize: 6.8, textColor: [30, 41, 59], halign: 'right' },
+      columnStyles: {
+        0: { fontStyle: 'bold', halign: 'center', cellWidth: 16 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 24 },
+        6: { cellWidth: 22 },
+        7: { cellWidth: 20 },
+        8: { cellWidth: 20 }
+      },
+      margin: { left: 14, right: 14 }
+    });
+
+    y = doc.lastAutoTable.finalY + 6;
+
+    // --- DESCRIPCIONES MORFOLÓGICAS DE HORIZONTES ---
+    const horizsWithDesc = horizs.filter(h => h.descripcion && h.descripcion.trim());
+    if (horizsWithDesc.length > 0) {
+      if (y > 220) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(...primaryColor);
+      doc.text("DESCRIPCIÓN MORFOLÓGICA DE HORIZONTES (CAMPO):", 14, y);
+      y += 4;
+
+      doc.setFontSize(7.5);
+      horizsWithDesc.forEach(h => {
+        if (y > 275) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59);
+        const horizTitle = `Horizonte ${h.horizonte} (${h.desde ?? 0} - ${h.hasta ?? ''} cm):`;
+        doc.text(horizTitle, 14, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(71, 85, 105);
+        const splitHDesc = doc.splitTextToSize(h.descripcion, 182);
+        doc.text(splitHDesc, 14, y + 3.5);
+        y += (splitHDesc.length * 3.2) + 5;
+      });
+    }
+
   } else {
-    // Si la serie no tiene análisis de laboratorio (como La Bolsa)
+    // Si la serie no tiene análisis de laboratorio (como La Bolsa o Los Alamos)
     doc.setDrawColor(226, 232, 240);
     doc.setFillColor(248, 250, 252);
     doc.roundedRect(14, y, 182, 14, 2, 2, 'FD');
@@ -219,7 +310,7 @@ function exportSoilPDF(serieData, ucData, capUsoData, practicasData) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...primaryColor);
-    doc.text(`APTITUD AGRONÓMICA - CAPACIDAD DE USO (CLASE ${capUsoData.clase}):`, 14, y);
+    doc.text(`APTITUD AGRONÓMICA - CAPACIDAD DE USO (CLASE ${formatCapUsoPDF(capUsoData.clase)}):`, 14, y);
     y += 5;
 
     doc.setFont('helvetica', 'normal');

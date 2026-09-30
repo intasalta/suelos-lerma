@@ -98,17 +98,39 @@ body {
 /* Tabla de horizontes compacta y clara */
 .horizon-table th {
   background-color: #f1f5f9;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   padding: 6px 8px;
-  color: #475569;
+  color: #334155;
+  border-bottom: 2px solid #cbd5e1;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.horizon-table tr:hover td {
+  background-color: #f8fafc;
 }
 
 .horizon-table td {
   padding: 6px 8px;
-  font-size: 0.82rem;
-  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.78rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.view-filter-btn.active {
+  background-color: #ffffff;
+  color: #065f46;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.profile-pill.active {
+  background-color: #1b4332;
+  color: #ffffff;
+  border-color: #1b4332;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 /* Badges personalizados */
