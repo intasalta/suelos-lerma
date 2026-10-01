@@ -355,6 +355,7 @@ function updateLegend() {
 }
 
 // Resaltar TODOS los polígonos donde participa una Serie (Unidades Cartográficas asociadas)
+// Resaltar TODOS los polígonos donde participa una Serie (Unidades Cartográficas asociadas)
 function highlightSeriesPolygons(serieName, ucsList = []) {
   if (!serieName || !geojsonLayer) return false;
 
@@ -368,6 +369,7 @@ function highlightSeriesPolygons(serieName, ucsList = []) {
   }
 
   const matchingLayers = [];
+  let primaryLayer = null;
 
   geojsonLayer.eachLayer(layer => {
     const p = layer.feature.properties || {};
@@ -387,6 +389,11 @@ function highlightSeriesPolygons(serieName, ucsList = []) {
         color: '#f59e0b', // Borde dorado vibrante
         fillOpacity: Math.min(1, layerOpacity + 0.3)
       });
+
+      // Preferir la unidad representativa / consociación base (ej: SJv en lugar de SJv2)
+      if (!primaryLayer && ucsLower.length > 0 && nom === ucsLower[0]) {
+        primaryLayer = layer;
+      }
     } else {
       geojsonLayer.resetStyle(layer);
     }
@@ -396,13 +403,13 @@ function highlightSeriesPolygons(serieName, ucsList = []) {
     const group = L.featureGroup(matchingLayers);
     map.fitBounds(group.getBounds(), { padding: [40, 40], maxZoom: 14 });
 
-    // Seleccionar el primer polígono para abrir el panel
-    const firstLayer = matchingLayers[0];
-    selectedLayer = firstLayer;
-    firstLayer.setStyle({ weight: 4, color: '#2563eb' });
+    // Seleccionar preferentemente la consociación representativa o el primer polígono
+    const selected = primaryLayer || matchingLayers[0];
+    selectedLayer = selected;
+    selected.setStyle({ weight: 4, color: '#2563eb' });
 
     // Disparar evento para actualizar panel
-    const event = new CustomEvent('soilSelected', { detail: { feature: firstLayer.feature } });
+    const event = new CustomEvent('soilSelected', { detail: { feature: selected.feature } });
     window.dispatchEvent(event);
 
     return true;
@@ -412,30 +419,45 @@ function highlightSeriesPolygons(serieName, ucsList = []) {
   }
 }
 
-// Búsqueda de entidad por texto
+// Búsqueda de entidad por texto con priorización estricta (exacto > serie > prefijo > subcadena)
 function findAndHighlight(query) {
   if (!query || !geojsonLayer) return false;
   const q = query.toLowerCase().trim();
-  let targetLayer = null;
-  let targetFeature = null;
+  
+  let exactUcLayer = null;
+  let exactSerieLayer = null;
+  let startsWithLayer = null;
+  let partialLayer = null;
 
   geojsonLayer.eachLayer(layer => {
     const p = layer.feature.properties || {};
-    const nom = (p.nomencla || '').toLowerCase();
-    const s1 = (p.suelo_1 || '').toLowerCase();
-    const s2 = (p.suelo_2 || '').toLowerCase();
+    const nom = (p.nomencla || '').toLowerCase().trim();
+    const s1 = (p.suelo_1 || '').toLowerCase().trim();
+    const s2 = (p.suelo_2 || '').toLowerCase().trim();
 
-    if (nom === q || s1 === q || s2 === q || nom.includes(q) || s1.includes(q) || s2.includes(q)) {
-      if (!targetLayer) {
-        targetLayer = layer;
-        targetFeature = layer.feature;
-      }
+    // 1. Coincidencia exacta de nomenclatura (ej: "sjv" === "sjv")
+    if (nom === q) {
+      if (!exactUcLayer) exactUcLayer = layer;
+    }
+    // 2. Coincidencia exacta con nombre de serie
+    else if (s1 === q || s2 === q) {
+      if (!exactSerieLayer) exactSerieLayer = layer;
+    }
+    // 3. Comienza con el texto (prefijo)
+    else if (nom.startsWith(q) || s1.startsWith(q)) {
+      if (!startsWithLayer) startsWithLayer = layer;
+    }
+    // 4. Subcadena contenida
+    else if (nom.includes(q) || s1.includes(q) || s2.includes(q)) {
+      if (!partialLayer) partialLayer = layer;
     }
   });
 
+  const targetLayer = exactUcLayer || exactSerieLayer || startsWithLayer || partialLayer;
+
   if (targetLayer) {
     map.fitBounds(targetLayer.getBounds(), { maxZoom: 14, padding: [50, 50] });
-    selectFeature(targetFeature, targetLayer);
+    selectFeature(targetLayer.feature, targetLayer);
     return true;
   }
   return false;

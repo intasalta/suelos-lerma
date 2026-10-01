@@ -5,7 +5,7 @@
     "institucion": "INTA EEA Salta - Laboratorio de Teledetección y SIG",
     "superficie_ha": 170000,
     "total_series": 38,
-    "total_unidades": 75
+    "total_unidades": 77
   },
   "unidades_cartograficas": {
     "Ce3": {
@@ -1014,6 +1014,33 @@
       "suelo_2": "",
       "series_componentes": [
         "Viñaco"
+      ]
+    },
+    "CoLaI2": {
+      "simbolo": "CoLaI2",
+      "nombre": "Complejo La Isla anegable 50%, Ranchera 50%",
+      "tipo": "Complejo",
+      "ipc": 13.0,
+      "cap_uso": "5sd",
+      "descripcion": "Este complejo corresponde a vías de escurrimiento manifiestas, con relieve cóncavo. La fase anegable de la serie La Isla que ocupa explanadas, se asocia en proporción similar a la serie La Ranchera que se sitúa en las partes más bajas: cauces, depresiones y microrelieve de cubetas. Son suelos de aptitud marginal para agricultura, las deficiencias marcadas de drenaje condenan su uso a campos naturales de pastoreo.",
+      "suelo_1": "La Isla",
+      "suelo_2": "Ranchera",
+      "series_componentes": [
+        "La Isla",
+        "Ranchera"
+      ]
+    },
+    "EZa": {
+      "simbolo": "EZa",
+      "nombre": "Consociación El Zanjón",
+      "tipo": "Consociación",
+      "ipc": 46.0,
+      "cap_uso": "1",
+      "descripcion": "La serie El Zanjón se encuentra en la parte central del Valle de Lerma; en paisaje de planicies suavemente inclinadas. Los suelos de la serie son profundos y bien drenados, no presenta limitaciones que afecten a su uso agrícola.",
+      "suelo_1": "El Zanjón",
+      "suelo_2": "",
+      "series_componentes": [
+        "El Zanjón"
       ]
     }
   },
@@ -3540,6 +3567,7 @@
       ],
       "unidades_asociadas": [
         "Ce10",
+        "EZa",
         "Eza"
       ],
       "capacidad_uso_sugerida": "1"
@@ -5148,6 +5176,7 @@
         }
       ],
       "unidades_asociadas": [
+        "CoLaI2",
         "CoLal2",
         "LaI",
         "LaI1"
@@ -8395,6 +8424,7 @@
         }
       ],
       "unidades_asociadas": [
+        "CoLaI2",
         "CoLal2"
       ],
       "capacidad_uso_sugerida": "5sd"

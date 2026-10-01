@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     appData = await res.json();
     console.log("Datos de suelos cargados:", appData);
     populateSeriesCatalog();
+    populateSearchSuggestions();
   } catch (err) {
     console.error("Error al cargar data/suelos_info.json:", err);
   }
@@ -550,9 +551,12 @@ function displaySoilDetails(feature) {
         const isCurrent = u.toLowerCase() === nomencla.toLowerCase();
         badge.className = `px-2 py-0.5 rounded font-mono font-bold text-xs transition ${isCurrent ? 'bg-[#1b4332] text-white shadow-sm' : 'bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300'}`;
         badge.textContent = u;
-        badge.title = `Ver unidad cartográfica ${u} en el mapa`;
+        badge.title = `Ver unidad cartográfica ${u} en el mapa y ficha técnica`;
         badge.addEventListener('click', () => {
-          window.mapModule.findAndHighlight(u);
+          const found = window.mapModule.findAndHighlight(u);
+          if (!found) {
+            displaySoilDetailsByUC(u);
+          }
         });
         ucsContainer.appendChild(badge);
       });
@@ -853,9 +857,20 @@ function populateSeriesCatalog() {
           <span><i class="fa-solid fa-layer-group text-slate-400 mr-1"></i> ${pCount}</span>
           <span class="truncate ml-1" title="${hojasLabel}">${hojasLabel}</span>
         </div>
-        <div class="text-[11px] text-emerald-900 bg-emerald-50/80 border border-emerald-200 px-2 py-1 rounded-lg mb-2.5 flex items-center gap-1.5">
-          <i class="fa-solid fa-map-location-dot text-emerald-700"></i>
-          <span class="truncate">Unidades: <b>${(s.unidades_asociadas && s.unidades_asociadas.length > 0) ? s.unidades_asociadas.join(', ') : 'Consignada en cartas'}</b></span>
+        <div class="text-[11px] text-emerald-900 bg-emerald-50/80 border border-emerald-200 px-2.5 py-1.5 rounded-lg mb-2.5">
+          <div class="flex items-center gap-1.5 mb-1.5 text-slate-600 font-medium text-[11px]">
+            <i class="fa-solid fa-map-location-dot text-emerald-700"></i>
+            <span>Unidades cartográficas asociadas:</span>
+          </div>
+          <div class="flex flex-wrap gap-1">
+            ${(s.unidades_asociadas && s.unidades_asociadas.length > 0)
+              ? s.unidades_asociadas.map(u => `
+                  <button type="button" class="catalog-uc-pill px-2 py-0.5 rounded bg-white hover:bg-[#1b4332] hover:text-white text-emerald-900 border border-emerald-300 font-mono font-bold text-xs transition shadow-2xs cursor-pointer" data-uc="${u}" title="Ver unidad ${u} en el mapa y ficha técnica">
+                    ${u}
+                  </button>
+                `).join('')
+              : '<span class="text-xs text-slate-400 italic">Consignada en cartas</span>'}
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
           <button class="download-serie-pdf-btn bg-[#1b4332] hover:bg-[#2d6a4f] text-white py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-sm" data-serie="${s.nombre}" title="Descargar Ficha PDF">
@@ -890,8 +905,74 @@ function populateSeriesCatalog() {
       });
     }
 
+    // Evento Clic en Pills de Unidades Cartográficas asociadas
+    card.querySelectorAll('.catalog-uc-pill').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const ucSymbol = btn.getAttribute('data-uc');
+        const catalogModal = document.getElementById('catalog-modal');
+        if (catalogModal) catalogModal.classList.remove('active');
+        const found = window.mapModule.findAndHighlight(ucSymbol);
+        if (!found) {
+          displaySoilDetailsByUC(ucSymbol);
+        }
+      });
+    });
+
     container.appendChild(card);
   });
+}
+
+// Mostrar detalles de suelo a partir del símbolo de unidad cartográfica
+function displaySoilDetailsByUC(ucSymbol) {
+  if (!appData) return;
+  const uc = appData.unidades_cartograficas?.[ucSymbol] || {};
+  const s1 = uc.suelo_1 || '';
+  const pseudoFeature = {
+    type: 'Feature',
+    properties: {
+      nomencla: ucSymbol,
+      suelo_1: s1,
+      suelo_2: uc.suelo_2 || '',
+      ipc: uc.ipc,
+      cap_uso: uc.cap_uso,
+      hoja: ''
+    }
+  };
+  displaySoilDetails(pseudoFeature);
+}
+
+// Llenar autocompletado en el buscador
+function populateSearchSuggestions() {
+  const datalist = document.getElementById('search-datalist');
+  if (!datalist || !appData) return;
+  datalist.innerHTML = '';
+
+  const added = new Set();
+
+  if (appData.unidades_cartograficas) {
+    Object.entries(appData.unidades_cartograficas).forEach(([sym, uc]) => {
+      if (!added.has(sym)) {
+        added.add(sym);
+        const opt = document.createElement('option');
+        opt.value = sym;
+        opt.label = `${sym} - ${uc.nombre || uc.tipo || ''}`;
+        datalist.appendChild(opt);
+      }
+    });
+  }
+
+  if (appData.series) {
+    Object.keys(appData.series).forEach(sNom => {
+      if (!added.has(sNom)) {
+        added.add(sNom);
+        const opt = document.createElement('option');
+        opt.value = sNom;
+        opt.label = `Serie ${sNom}`;
+        datalist.appendChild(opt);
+      }
+    });
+  }
 }
 
 // Configurar buscador y filtros del catálogo

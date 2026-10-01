@@ -166,7 +166,26 @@ function exportSoilPDF(serieData, ucData, capUsoData, practicasData, selectedPro
     const ubicTxt = profile.ubicacion ? ` - Sitio: ${profile.ubicacion}` : '';
     const hojaTxt = profile.hoja ? `Hoja ${profile.hoja}` : 'Valle de Lerma';
     doc.text(`PERFIL TÍPICO DE CAMPO (${hojaTxt}${ubicTxt}):`, 14, y);
-    y += 5;
+    y += 4.5;
+
+    const siteItems = [];
+    if (profile.paisaje) siteItems.push(`Paisaje: ${profile.paisaje}`);
+    if (profile.relieve) siteItems.push(`Relieve: ${profile.relieve}`);
+    if (profile.vegetacion) siteItems.push(`Vegetación*: ${profile.vegetacion}`);
+    if (profile.uso_tierra) siteItems.push(`Uso actual*: ${profile.uso_tierra}`);
+
+    if (siteItems.length > 0) {
+      doc.setFontSize(7.2);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85);
+      doc.text(siteItems.join(' | '), 14, y);
+      y += 3.8;
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(100, 116, 139);
+      doc.text('(*) Nota: Vegetación y Uso actual corresponden a la "Carta de suelos de la República Argentina, Salta - Valle de Lerma" (1999, 2000, 2004 - J.R. Vargas Gil).', 14, y);
+      y += 4.5;
+    }
   }
 
   // --- TABLA 1: GRANULOMETRÍA Y FERTILIDAD QUÍMICA ---
@@ -358,7 +377,7 @@ function exportSoilPDF(serieData, ucData, capUsoData, practicasData, selectedPro
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(148, 163, 184);
     doc.text(
-      "Fuente: Adecuación a SIG de Cartas de Suelos del Valle de Lerma (Salta, 2012) - Castrillo, Osinaga, Elena, Paoli. INTA EEA Salta.",
+      "Fuente: Carta de Suelos Valle de Lerma (J.R. Vargas Gil, 1999-2004) y Adecuación a SIG (Castrillo et al., 2012) - INTA EEA Salta.",
       14,
       290
     );

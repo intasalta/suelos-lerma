@@ -49,9 +49,11 @@
         <input 
           type="text" 
           id="search-input" 
+          list="search-datalist"
           placeholder="Buscar serie o símbolo..." 
           class="bg-emerald-950/80 text-xs text-white placeholder-emerald-300/60 pl-8 pr-3 py-1.5 rounded-lg border border-emerald-700/80 focus:outline-none focus:ring-1 focus:ring-amber-400 w-36 sm:w-56 transition-all"
         />
+        <datalist id="search-datalist"></datalist>
         <i class="fa-solid fa-magnifying-glass text-xs text-emerald-300 absolute left-2.5 pointer-events-none"></i>
         <button id="search-btn" class="sr-only">Buscar</button>
       </div>
@@ -282,9 +284,14 @@
               <div><span class="text-slate-500">Drenaje:</span> <span id="sb-drenaje" class="font-medium text-slate-800">-</span></div>
               <div><span class="text-slate-500">Permeabilidad:</span> <span id="sb-permeabilidad" class="font-medium text-slate-800">-</span></div>
               <div><span class="text-slate-500">Material Originario:</span> <span id="sb-material" class="font-medium text-slate-800">-</span></div>
-              <div class="col-span-2"><span class="text-slate-500">Vegetación:</span> <span id="sb-vegetacion" class="font-medium text-slate-800">-</span></div>
+              <div class="col-span-2"><span class="text-slate-500">Vegetación (*):</span> <span id="sb-vegetacion" class="font-medium text-slate-800">-</span></div>
               <div class="col-span-2"><span class="text-slate-500">Limitación Principal:</span> <span id="sb-limitacion" class="font-medium text-slate-800">-</span></div>
-              <div class="col-span-2"><span class="text-slate-500">Uso Actual:</span> <span id="sb-uso-tierra" class="font-medium text-slate-800">-</span></div>
+              <div class="col-span-2"><span class="text-slate-500">Uso Actual (*):</span> <span id="sb-uso-tierra" class="font-medium text-slate-800">-</span></div>
+            </div>
+            <!-- Nota aclaratoria sobre el estudio original -->
+            <div class="pt-2 mt-1 border-t border-slate-200 text-[11px] text-slate-600 leading-snug flex items-start gap-1.5 bg-slate-50/90 -mx-1 px-2.5 py-2 rounded">
+              <i class="fa-solid fa-circle-info text-emerald-700 mt-0.5 shrink-0 text-xs"></i>
+              <span><b class="text-slate-800 font-semibold">(*) Nota sobre Vegetación y Uso actual:</b> La información presente corresponde al estudio original <em>"Carta de suelos de la República Argentina, Provincia de Salta - Valle de Lerma"</em> (1999, 2000 y 2004 - J.R. Vargas Gil).</span>
             </div>
           </div>
         </div>
@@ -480,10 +487,13 @@
         <p>
           Esta aplicación web interactiva integra y moderniza la información cartográfica y edáfica de las <b>Cartas de Suelos del Valle de Lerma (Provincia de Salta, Argentina)</b>.
         </p>
-        <div class="bg-emerald-50 border border-emerald-200 rounded p-2.5 text-emerald-900">
-          <p class="font-bold mb-1">Referencia Bibliográfica Oficial:</p>
+        <div class="bg-emerald-50 border border-emerald-200 rounded p-2.5 text-emerald-900 space-y-1.5">
+          <p class="font-bold">Referencias Bibliográficas Oficiales:</p>
           <p class="italic text-[11px]">
-            Castrillo, S., Osinaga, R., Elena, H., Paoli, H. (2012). <i>Adecuación a un SIG de las cartas de suelos del Valle de Lerma - Salta</i>. Laboratorio de Teledetección y SIG, Estación Experimental Agropecuaria Salta, INTA.
+            1. Vargas Gil, J. R. (1999, 2000, 2004). <i>Carta de suelos de la República Argentina, Provincia de Salta - Valle de Lerma</i>. INTA EEA Salta.
+          </p>
+          <p class="italic text-[11px]">
+            2. Castrillo, S., Osinaga, R., Elena, H., Paoli, H. (2012). <i>Adecuación a un SIG de las cartas de suelos del Valle de Lerma - Salta</i>. Laboratorio de Teledetección y SIG, EEA Salta, INTA.
           </p>
         </div>
         <p>

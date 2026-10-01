@@ -338,6 +338,16 @@ for r in mdb['Unid_Cart']:
         "series_componentes": []
     }
 
+# Compatibilidad con nomenclaturas del GeoJSON (CoLaI2 vs CoLal2, EZa vs Eza)
+aliases = {
+    'CoLaI2': 'CoLal2',
+    'EZa': 'Eza'
+}
+for geojson_sym, mdb_sym in aliases.items():
+    if mdb_sym in unidades_cart_dict and geojson_sym not in unidades_cart_dict:
+        unidades_cart_dict[geojson_sym] = dict(unidades_cart_dict[mdb_sym])
+        unidades_cart_dict[geojson_sym]['simbolo'] = geojson_sym
+
 # 7. Relación Bidireccional: Vincular Serie <-> Unidades Cartográficas
 for nom_serie, s_data in series_dict.items():
     ucs_de_serie = []
